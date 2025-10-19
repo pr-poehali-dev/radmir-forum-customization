@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -67,6 +67,9 @@ export default function Index() {
   const [showUsersDialog, setShowUsersDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [settingsForm, setSettingsForm] = useState({ newUsername: '', newPassword: '', confirmPassword: '' });
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(0.3);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const [topics, setTopics] = useState<Topic[]>([
     {
@@ -260,6 +263,23 @@ export default function Index() {
     }
   }, [user, registeredUsers]);
 
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = musicVolume;
+    }
+  }, [musicVolume]);
+
+  const toggleMusic = () => {
+    if (audioRef.current) {
+      if (isMusicPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsMusicPlaying(!isMusicPlaying);
+    }
+  };
+
   const handleCreateTopic = () => {
     if (!user) {
       toast.error('Войдите в аккаунт');
@@ -376,6 +396,11 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] relative overflow-hidden">
+      <audio 
+        ref={audioRef}
+        loop
+        src="https://assets.mixkit.co/music/preview/mixkit-tech-house-vibes-130.mp3"
+      />
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px]" />
       
       <div className="relative z-10 container mx-auto px-4 py-8">
@@ -390,6 +415,15 @@ export default function Index() {
                   </span>
                 </CardContent>
               </Card>
+
+              <Button 
+                onClick={toggleMusic}
+                variant="outline" 
+                className="border-border neon-border-blue"
+              >
+                <Icon name={isMusicPlaying ? "Volume2" : "VolumeX"} size={18} className="mr-2" />
+                {isMusicPlaying ? 'Музыка' : 'Музыка'}
+              </Button>
 
               <Dialog open={showUsersDialog} onOpenChange={setShowUsersDialog}>
                 <DialogTrigger asChild>
