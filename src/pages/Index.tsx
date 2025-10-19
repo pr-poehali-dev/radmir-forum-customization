@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 
@@ -39,43 +40,53 @@ interface ForumSettings {
   requireAuth: boolean;
 }
 
+type UserRole = 'ГС ГОСС' | 'ЗГС ГОСС' | 'АДМИНИСТРАТОР' | 'МОДЕРАТОР' | 'ПОЛЬЗОВАТЕЛЬ';
+
 interface RegisteredUser {
   username: string;
   password: string;
   email: string;
-  isAdmin: boolean;
+  role: UserRole;
   registeredAt: Date;
   isOnline?: boolean;
   lastActivity?: Date;
 }
 
+const ROLE_HIERARCHY: Record<UserRole, number> = {
+  'ГС ГОСС': 5,
+  'ЗГС ГОСС': 4,
+  'АДМИНИСТРАТОР': 3,
+  'МОДЕРАТОР': 2,
+  'ПОЛЬЗОВАТЕЛЬ': 1
+};
+
+const ROLE_COLORS: Record<UserRole, string> = {
+  'ГС ГОСС': '#ff006e',
+  'ЗГС ГОСС': '#ff006e',
+  'АДМИНИСТРАТОР': '#00d4ff',
+  'МОДЕРАТОР': '#00ff88',
+  'ПОЛЬЗОВАТЕЛЬ': '#8E9196'
+};
+
 export default function Index() {
-  const [user, setUser] = useState<{ username: string; isAdmin: boolean } | null>(null);
+  const [user, setUser] = useState<{ username: string; role: UserRole } | null>(null);
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([
     {
       username: 'admin',
       password: 'admin',
-      email: 'admin@radmir.rp',
-      isAdmin: true,
+      email: 'admin@capital.rp',
+      role: 'ГС ГОСС',
       registeredAt: new Date('2025-01-01'),
       isOnline: true,
       lastActivity: new Date()
     }
   ]);
 
-  const [onlineUsers, setOnlineUsers] = useState<number>(1);
-  const [showUsersDialog, setShowUsersDialog] = useState(false);
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
-  const [settingsForm, setSettingsForm] = useState({ newUsername: '', newPassword: '', confirmPassword: '' });
-  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
-  const [musicVolume, setMusicVolume] = useState(0.3);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
   const [topics, setTopics] = useState<Topic[]>([
     {
       id: 1,
-      title: 'Правила форума Radmir RP',
-      content: 'Добро пожаловать на форум Radmir RP! Здесь вы можете обсуждать игровые моменты...',
+      title: 'Правила форума Capital RP',
+      content: 'Добро пожаловать на форум Capital RP! Здесь вы можете обсуждать игровые моменты...',
       author: 'admin',
       replies: 2,
       views: 1203,
@@ -145,6 +156,15 @@ export default function Index() {
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [newComment, setNewComment] = useState('');
+  const [onlineUsers, setOnlineUsers] = useState<number>(1);
+  const [showUsersDialog, setShowUsersDialog] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({ newUsername: '', newPassword: '', confirmPassword: '' });
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(0.3);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [selectedUserForRole, setSelectedUserForRole] = useState<RegisteredUser | null>(null);
+  const [newRole, setNewRole] = useState<UserRole>('ПОЛЬЗОВАТЕЛЬ');
 
   const handleRegister = () => {
     if (!registerForm.username || !registerForm.password || !registerForm.email) {
@@ -161,7 +181,7 @@ export default function Index() {
       username: registerForm.username,
       password: registerForm.password,
       email: registerForm.email,
-      isAdmin: false,
+      role: 'ПОЛЬЗОВАТЕЛЬ',
       registeredAt: new Date()
     };
 
@@ -187,7 +207,7 @@ export default function Index() {
       return;
     }
 
-    setUser({ username: foundUser.username, isAdmin: foundUser.isAdmin });
+    setUser({ username: foundUser.username, role: foundUser.role });
     setRegisteredUsers(registeredUsers.map(u => 
       u.username === foundUser.username 
         ? { ...u, isOnline: true, lastActivity: new Date() }
@@ -235,7 +255,7 @@ export default function Index() {
         : c
     ));
 
-    setUser({ username: newUsername, isAdmin: user.isAdmin });
+    setUser({ username: newUsername, role: user.role });
     setSettingsForm({ newUsername: '', newPassword: '', confirmPassword: '' });
     setShowSettingsDialog(false);
     toast.success('Профиль обновлен!');
@@ -278,6 +298,45 @@ export default function Index() {
       }
       setIsMusicPlaying(!isMusicPlaying);
     }
+  };
+
+  const canModerate = () => {
+    if (!user) return false;
+    return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['МОДЕРАТОР'];
+  };
+
+  const canAdministrate = () => {
+    if (!user) return false;
+    return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['АДМИНИСТРАТОР'];
+  };
+
+  const canManageRoles = () => {
+    if (!user) return false;
+    return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['ЗГС ГОСС'];
+  };
+
+  const handleChangeUserRole = () => {
+    if (!canManageRoles() || !selectedUserForRole) {
+      toast.error('Недостаточно прав');
+      return;
+    }
+
+    const currentUserRole = registeredUsers.find(u => u.username === user?.username)?.role;
+    if (!currentUserRole) return;
+
+    if (ROLE_HIERARCHY[newRole] >= ROLE_HIERARCHY[currentUserRole]) {
+      toast.error('Вы не можете назначить роль выше или равную вашей');
+      return;
+    }
+
+    setRegisteredUsers(registeredUsers.map(u => 
+      u.username === selectedUserForRole.username
+        ? { ...u, role: newRole }
+        : u
+    ));
+
+    toast.success(`Роль ${selectedUserForRole.username} изменена на ${newRole}`);
+    setSelectedUserForRole(null);
   };
 
   const handleCreateTopic = () => {
@@ -335,8 +394,8 @@ export default function Index() {
   };
 
   const deleteComment = (commentId: number) => {
-    if (!user?.isAdmin) {
-      toast.error('Только админы могут удалять комментарии');
+    if (!canModerate()) {
+      toast.error('Только модераторы и выше могут удалять комментарии');
       return;
     }
 
@@ -349,8 +408,8 @@ export default function Index() {
   };
 
   const toggleTopicStatus = (id: number) => {
-    if (!user?.isAdmin) {
-      toast.error('Только админы могут менять статус тем');
+    if (!canModerate()) {
+      toast.error('Только модераторы и выше могут менять статус тем');
       return;
     }
 
@@ -361,8 +420,8 @@ export default function Index() {
   };
 
   const deleteTopic = (id: number) => {
-    if (!user?.isAdmin) {
-      toast.error('Только админы могут удалять темы');
+    if (!canModerate()) {
+      toast.error('Только модераторы и выше могут удалять темы');
       return;
     }
 
@@ -372,8 +431,8 @@ export default function Index() {
   };
 
   const togglePinTopic = (id: number) => {
-    if (!user?.isAdmin) {
-      toast.error('Только админы могут закреплять темы');
+    if (!canAdministrate()) {
+      toast.error('Только администраторы и выше могут закреплять темы');
       return;
     }
 
@@ -444,8 +503,8 @@ export default function Index() {
                           <CardContent className="py-3 px-4">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center neon-border" style={{ backgroundColor: forumSettings.accentColor + '20' }}>
-                                  <Icon name="User" size={18} style={{ color: forumSettings.accentColor }} />
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center neon-border" style={{ backgroundColor: ROLE_COLORS[regUser.role] + '20' }}>
+                                  <Icon name="User" size={18} style={{ color: ROLE_COLORS[regUser.role] }} />
                                 </div>
                                 <div>
                                   <div className="flex items-center gap-2">
@@ -463,9 +522,9 @@ export default function Index() {
                                 </div>
                               </div>
                               <div className="text-right">
-                                {regUser.isAdmin && (
-                                  <Badge className="bg-accent text-accent-foreground">Admin</Badge>
-                                )}
+                                <Badge style={{ backgroundColor: ROLE_COLORS[regUser.role], color: '#0a0a0f' }}>
+                                  {regUser.role}
+                                </Badge>
                               </div>
                             </div>
                           </CardContent>
@@ -578,12 +637,14 @@ export default function Index() {
             ) : (
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center neon-border" style={{ backgroundColor: forumSettings.accentColor + '20' }}>
-                    <Icon name="User" size={20} style={{ color: forumSettings.accentColor }} />
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center neon-border" style={{ backgroundColor: ROLE_COLORS[user.role] + '20' }}>
+                    <Icon name="User" size={20} style={{ color: ROLE_COLORS[user.role] }} />
                   </div>
                   <div>
                     <p className="font-semibold">{user.username}</p>
-                    {user.isAdmin && <Badge className="bg-accent text-accent-foreground">Admin</Badge>}
+                    <Badge style={{ backgroundColor: ROLE_COLORS[user.role], color: '#0a0a0f' }}>
+                      {user.role}
+                    </Badge>
                   </div>
                 </div>
                 <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
@@ -663,7 +724,7 @@ export default function Index() {
                 Мои темы
               </TabsTrigger>
             )}
-            {user?.isAdmin && (
+            {canAdministrate() && (
               <TabsTrigger value="admin" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
                 <Icon name="Settings" className="mr-2" size={18} />
                 Админ-панель
@@ -736,11 +797,13 @@ export default function Index() {
                         <CardTitle className="text-xl mb-1">{topic.title}</CardTitle>
                         <CardDescription>{topic.content}</CardDescription>
                       </div>
-                      {user?.isAdmin && (
+                      {canModerate() && (
                         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                          <Button size="sm" variant="outline" onClick={() => togglePinTopic(topic.id)} className="border-border">
-                            <Icon name={topic.isPinned ? "PinOff" : "Pin"} size={16} />
-                          </Button>
+                          {canAdministrate() && (
+                            <Button size="sm" variant="outline" onClick={() => togglePinTopic(topic.id)} className="border-border">
+                              <Icon name={topic.isPinned ? "PinOff" : "Pin"} size={16} />
+                            </Button>
+                          )}
                           <Button size="sm" variant="outline" onClick={() => toggleTopicStatus(topic.id)} className="border-border">
                             <Icon name={topic.isOpen ? "Lock" : "Unlock"} size={16} />
                           </Button>
@@ -809,7 +872,7 @@ export default function Index() {
             </TabsContent>
           )}
 
-          {user?.isAdmin && (
+          {canAdministrate() && (
             <TabsContent value="admin" className="space-y-6">
               <Card className="bg-card border-accent neon-border-pink">
                 <CardHeader>
@@ -882,6 +945,56 @@ export default function Index() {
                       </Card>
                     </div>
                   </div>
+
+                  {canManageRoles() && (
+                    <div className="pt-4 border-t border-border">
+                      <h3 className="font-semibold mb-3 flex items-center gap-2">
+                        <Icon name="Shield" size={20} />
+                        Управление ролями
+                      </h3>
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                        {registeredUsers
+                          .filter(u => u.username !== user?.username)
+                          .map((regUser) => {
+                            const currentUserRole = registeredUsers.find(u => u.username === user?.username)?.role;
+                            const canChangeThisUser = currentUserRole && ROLE_HIERARCHY[regUser.role] < ROLE_HIERARCHY[currentUserRole];
+                            
+                            return (
+                              <Card key={regUser.username} className="bg-muted/30 border-border">
+                                <CardContent className="py-3 px-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full flex items-center justify-center neon-border" style={{ backgroundColor: ROLE_COLORS[regUser.role] + '20' }}>
+                                        <Icon name="User" size={16} style={{ color: ROLE_COLORS[regUser.role] }} />
+                                      </div>
+                                      <div>
+                                        <p className="font-semibold text-sm">{regUser.username}</p>
+                                        <Badge style={{ backgroundColor: ROLE_COLORS[regUser.role], color: '#0a0a0f' }} className="text-xs">
+                                          {regUser.role}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                    {canChangeThisUser && (
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        onClick={() => {
+                                          setSelectedUserForRole(regUser);
+                                          setNewRole(regUser.role);
+                                        }}
+                                        className="border-border"
+                                      >
+                                        <Icon name="Edit" size={14} />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -941,7 +1054,7 @@ export default function Index() {
                                 <p className="text-xs text-muted-foreground">{comment.createdAt.toLocaleString('ru-RU')}</p>
                               </div>
                             </div>
-                            {user?.isAdmin && (
+                            {canModerate() && (
                               <Button size="sm" variant="ghost" onClick={() => deleteComment(comment.id)} className="text-destructive hover:text-destructive">
                                 <Icon name="Trash2" size={14} />
                               </Button>
@@ -982,6 +1095,43 @@ export default function Index() {
                   Тема закрыта для комментариев
                 </div>
               )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedUserForRole} onOpenChange={(open) => !open && setSelectedUserForRole(null)}>
+        <DialogContent className="bg-card border-border neon-border">
+          {selectedUserForRole && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-2xl" style={{ color: forumSettings.accentColor }}>Изменить роль</DialogTitle>
+                <DialogDescription>Назначьте новую роль пользователю {selectedUserForRole.username}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Выберите роль</Label>
+                  <Select value={newRole} onValueChange={(value: UserRole) => setNewRole(value)}>
+                    <SelectTrigger className="bg-input border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      <SelectItem value="ПОЛЬЗОВАТЕЛЬ">ПОЛЬЗОВАТЕЛЬ</SelectItem>
+                      <SelectItem value="МОДЕРАТОР">МОДЕРАТОР</SelectItem>
+                      <SelectItem value="АДМИНИСТРАТОР">АДМИНИСТРАТОР</SelectItem>
+                      {ROLE_HIERARCHY[user?.role || 'ПОЛЬЗОВАТЕЛЬ'] >= ROLE_HIERARCHY['ГС ГОСС'] && (
+                        <>
+                          <SelectItem value="ЗГС ГОСС">ЗГС ГОСС</SelectItem>
+                          <SelectItem value="ГС ГОСС">ГС ГОСС</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={handleChangeUserRole} className="w-full neon-border" style={{ backgroundColor: forumSettings.accentColor, color: '#0a0a0f' }}>
+                  Применить
+                </Button>
+              </div>
             </>
           )}
         </DialogContent>
