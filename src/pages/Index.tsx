@@ -65,6 +65,8 @@ export default function Index() {
 
   const [onlineUsers, setOnlineUsers] = useState<number>(1);
   const [showUsersDialog, setShowUsersDialog] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({ newUsername: '', newPassword: '', confirmPassword: '' });
 
   const [topics, setTopics] = useState<Topic[]>([
     {
@@ -191,6 +193,49 @@ export default function Index() {
     toast.success(`Добро пожаловать, ${foundUser.username}!`);
     setLoginForm({ username: '', password: '' });
     setShowLoginDialog(false);
+  };
+
+  const handleUpdateProfile = () => {
+    if (!user) return;
+
+    if (settingsForm.newPassword && settingsForm.newPassword !== settingsForm.confirmPassword) {
+      toast.error('Пароли не совпадают');
+      return;
+    }
+
+    if (settingsForm.newUsername && settingsForm.newUsername !== user.username) {
+      if (registeredUsers.find(u => u.username.toLowerCase() === settingsForm.newUsername.toLowerCase())) {
+        toast.error('Пользователь с таким именем уже существует');
+        return;
+      }
+    }
+
+    const oldUsername = user.username;
+    const newUsername = settingsForm.newUsername || user.username;
+    const newPassword = settingsForm.newPassword || registeredUsers.find(u => u.username === user.username)?.password || '';
+
+    setRegisteredUsers(registeredUsers.map(u => 
+      u.username === oldUsername
+        ? { ...u, username: newUsername, password: newPassword }
+        : u
+    ));
+
+    setTopics(topics.map(t => 
+      t.author === oldUsername
+        ? { ...t, author: newUsername }
+        : t
+    ));
+
+    setComments(comments.map(c => 
+      c.author === oldUsername
+        ? { ...c, author: newUsername }
+        : c
+    ));
+
+    setUser({ username: newUsername, isAdmin: user.isAdmin });
+    setSettingsForm({ newUsername: '', newPassword: '', confirmPassword: '' });
+    setShowSettingsDialog(false);
+    toast.success('Профиль обновлен!');
   };
 
   useEffect(() => {
@@ -378,19 +423,15 @@ export default function Index() {
                                       </div>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Icon name="Mail" size={12} />
-                                    <span>{regUser.email}</span>
-                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Регистрация: {regUser.registeredAt.toLocaleDateString('ru-RU')}
+                                  </p>
                                 </div>
                               </div>
                               <div className="text-right">
                                 {regUser.isAdmin && (
-                                  <Badge className="bg-accent text-accent-foreground mb-1">Admin</Badge>
+                                  <Badge className="bg-accent text-accent-foreground">Admin</Badge>
                                 )}
-                                <p className="text-xs text-muted-foreground">
-                                  Регистрация: {regUser.registeredAt.toLocaleDateString('ru-RU')}
-                                </p>
                               </div>
                             </div>
                           </CardContent>
@@ -511,6 +552,56 @@ export default function Index() {
                     {user.isAdmin && <Badge className="bg-accent text-accent-foreground">Admin</Badge>}
                   </div>
                 </div>
+                <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="border-border">
+                      <Icon name="Settings" size={18} />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-card border-border neon-border">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl" style={{ color: forumSettings.accentColor }}>Настройки профиля</DialogTitle>
+                      <DialogDescription>Измените свой логин или пароль</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Новый логин</Label>
+                        <Input 
+                          value={settingsForm.newUsername}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, newUsername: e.target.value })}
+                          placeholder={user.username}
+                          className="bg-input border-border"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Оставьте пустым, чтобы не менять</p>
+                      </div>
+                      <div>
+                        <Label>Новый пароль</Label>
+                        <Input 
+                          type="password"
+                          value={settingsForm.newPassword}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, newPassword: e.target.value })}
+                          placeholder="Введите новый пароль"
+                          className="bg-input border-border"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Оставьте пустым, чтобы не менять</p>
+                      </div>
+                      <div>
+                        <Label>Подтвердите пароль</Label>
+                        <Input 
+                          type="password"
+                          value={settingsForm.confirmPassword}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, confirmPassword: e.target.value })}
+                          placeholder="Повторите новый пароль"
+                          className="bg-input border-border"
+                          disabled={!settingsForm.newPassword}
+                        />
+                      </div>
+                      <Button onClick={handleUpdateProfile} className="w-full neon-border" style={{ backgroundColor: forumSettings.accentColor, color: '#0a0a0f' }}>
+                        Сохранить изменения
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
                 <Button variant="outline" onClick={() => {
                   setRegisteredUsers(registeredUsers.map(u => 
                     u.username === user.username 
