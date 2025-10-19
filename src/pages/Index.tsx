@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -45,6 +45,8 @@ interface RegisteredUser {
   email: string;
   isAdmin: boolean;
   registeredAt: Date;
+  isOnline?: boolean;
+  lastActivity?: Date;
 }
 
 export default function Index() {
@@ -55,9 +57,14 @@ export default function Index() {
       password: 'admin',
       email: 'admin@radmir.rp',
       isAdmin: true,
-      registeredAt: new Date('2025-01-01')
+      registeredAt: new Date('2025-01-01'),
+      isOnline: true,
+      lastActivity: new Date()
     }
   ]);
+
+  const [onlineUsers, setOnlineUsers] = useState<number>(1);
+  const [showUsersDialog, setShowUsersDialog] = useState(false);
 
   const [topics, setTopics] = useState<Topic[]>([
     {
@@ -176,10 +183,37 @@ export default function Index() {
     }
 
     setUser({ username: foundUser.username, isAdmin: foundUser.isAdmin });
+    setRegisteredUsers(registeredUsers.map(u => 
+      u.username === foundUser.username 
+        ? { ...u, isOnline: true, lastActivity: new Date() }
+        : u
+    ));
     toast.success(`Добро пожаловать, ${foundUser.username}!`);
     setLoginForm({ username: '', password: '' });
     setShowLoginDialog(false);
   };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setOnlineUsers(Math.floor(Math.random() * 5) + registeredUsers.filter(u => u.isOnline).length);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [registeredUsers]);
+
+  useEffect(() => {
+    if (user) {
+      const activityInterval = setInterval(() => {
+        setRegisteredUsers(registeredUsers.map(u => 
+          u.username === user.username 
+            ? { ...u, lastActivity: new Date() }
+            : u
+        ));
+      }, 30000);
+
+      return () => clearInterval(activityInterval);
+    }
+  }, [user, registeredUsers]);
 
   const handleCreateTopic = () => {
     if (!user) {
@@ -301,6 +335,73 @@ export default function Index() {
       
       <div className="relative z-10 container mx-auto px-4 py-8">
         <header className="mb-8">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-4">
+              <Card className="bg-card/50 border-primary/30 neon-border">
+                <CardContent className="py-2 px-4 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  <span className="text-sm font-semibold" style={{ color: forumSettings.accentColor }}>
+                    {onlineUsers} онлайн
+                  </span>
+                </CardContent>
+              </Card>
+
+              <Dialog open={showUsersDialog} onOpenChange={setShowUsersDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="border-border neon-border-blue">
+                    <Icon name="Users" className="mr-2" size={18} />
+                    Пользователи ({registeredUsers.length})
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-card border-border neon-border max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl" style={{ color: forumSettings.accentColor }}>Пользователи форума</DialogTitle>
+                    <DialogDescription>Список всех зарегистрированных пользователей</DialogDescription>
+                  </DialogHeader>
+                  <ScrollArea className="max-h-[400px] pr-4">
+                    <div className="space-y-2">
+                      {registeredUsers.map((regUser) => (
+                        <Card key={regUser.username} className="bg-muted/30 border-border">
+                          <CardContent className="py-3 px-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center neon-border" style={{ backgroundColor: forumSettings.accentColor + '20' }}>
+                                  <Icon name="User" size={18} style={{ color: forumSettings.accentColor }} />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-semibold">{regUser.username}</p>
+                                    {regUser.isOnline && (
+                                      <div className="flex items-center gap-1">
+                                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                        <span className="text-xs text-primary">онлайн</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Icon name="Mail" size={12} />
+                                    <span>{regUser.email}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                {regUser.isAdmin && (
+                                  <Badge className="bg-accent text-accent-foreground mb-1">Admin</Badge>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                  Регистрация: {regUser.registeredAt.toLocaleDateString('ru-RU')}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-5xl font-bold mb-2 neon-glow" style={{ color: forumSettings.accentColor }}>
@@ -410,7 +511,14 @@ export default function Index() {
                     {user.isAdmin && <Badge className="bg-accent text-accent-foreground">Admin</Badge>}
                   </div>
                 </div>
-                <Button variant="outline" onClick={() => setUser(null)} className="border-border">
+                <Button variant="outline" onClick={() => {
+                  setRegisteredUsers(registeredUsers.map(u => 
+                    u.username === user.username 
+                      ? { ...u, isOnline: false }
+                      : u
+                  ));
+                  setUser(null);
+                }} className="border-border">
                   <Icon name="LogOut" size={18} />
                 </Button>
               </div>
