@@ -40,7 +40,7 @@ interface ForumSettings {
   requireAuth: boolean;
 }
 
-type UserRole = 'ГС ГОСС' | 'ЗГС ГОСС' | 'АДМИНИСТРАТОР' | 'МОДЕРАТОР' | 'ПОЛЬЗОВАТЕЛЬ';
+type UserRole = 'ВЛАДЕЛЕЦ' | 'ЗАМ ВЛАДЕЛЬЦА' | 'РУКОВОДИТЕЛЬ' | 'ГЛАВНЫЙ АДМИН' | 'ЗАМ ГЛАВНОГО АДМИНА' | 'ГС ГОСС' | 'ЗГС ГОСС' | 'АДМИНИСТРАТОР' | 'МОДЕРАТОР' | 'ПОЛЬЗОВАТЕЛЬ';
 
 interface RegisteredUser {
   username: string;
@@ -53,6 +53,11 @@ interface RegisteredUser {
 }
 
 const ROLE_HIERARCHY: Record<UserRole, number> = {
+  'ВЛАДЕЛЕЦ': 10,
+  'ЗАМ ВЛАДЕЛЬЦА': 9,
+  'РУКОВОДИТЕЛЬ': 8,
+  'ГЛАВНЫЙ АДМИН': 7,
+  'ЗАМ ГЛАВНОГО АДМИНА': 6,
   'ГС ГОСС': 5,
   'ЗГС ГОСС': 4,
   'АДМИНИСТРАТОР': 3,
@@ -61,8 +66,13 @@ const ROLE_HIERARCHY: Record<UserRole, number> = {
 };
 
 const ROLE_COLORS: Record<UserRole, string> = {
+  'ВЛАДЕЛЕЦ': '#FFD700',
+  'ЗАМ ВЛАДЕЛЬЦА': '#FFA500',
+  'РУКОВОДИТЕЛЬ': '#FF4500',
+  'ГЛАВНЫЙ АДМИН': '#DC143C',
+  'ЗАМ ГЛАВНОГО АДМИНА': '#FF1493',
   'ГС ГОСС': '#ff006e',
-  'ЗГС ГОСС': '#ff006e',
+  'ЗГС ГОСС': '#9D4EDD',
   'АДМИНИСТРАТОР': '#00d4ff',
   'МОДЕРАТОР': '#00ff88',
   'ПОЛЬЗОВАТЕЛЬ': '#8E9196'
@@ -75,7 +85,7 @@ export default function Index() {
       username: 'admin',
       password: 'admin',
       email: 'admin@capital.rp',
-      role: 'ГС ГОСС',
+      role: 'ВЛАДЕЛЕЦ',
       registeredAt: new Date('2025-01-01'),
       isOnline: true,
       lastActivity: new Date()
@@ -312,7 +322,7 @@ export default function Index() {
 
   const canManageRoles = () => {
     if (!user) return false;
-    return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['ЗГС ГОСС'];
+    return ROLE_HIERARCHY[user.role] >= ROLE_HIERARCHY['АДМИНИСТРАТОР'];
   };
 
   const handleChangeUserRole = () => {
@@ -1119,11 +1129,22 @@ export default function Index() {
                       <SelectItem value="ПОЛЬЗОВАТЕЛЬ">ПОЛЬЗОВАТЕЛЬ</SelectItem>
                       <SelectItem value="МОДЕРАТОР">МОДЕРАТОР</SelectItem>
                       <SelectItem value="АДМИНИСТРАТОР">АДМИНИСТРАТОР</SelectItem>
-                      {ROLE_HIERARCHY[user?.role || 'ПОЛЬЗОВАТЕЛЬ'] >= ROLE_HIERARCHY['ГС ГОСС'] && (
-                        <>
-                          <SelectItem value="ЗГС ГОСС">ЗГС ГОСС</SelectItem>
-                          <SelectItem value="ГС ГОСС">ГС ГОСС</SelectItem>
-                        </>
+                      <SelectItem value="ЗГС ГОСС">ЗГС ГОСС</SelectItem>
+                      <SelectItem value="ГС ГОСС">ГС ГОСС</SelectItem>
+                      {ROLE_HIERARCHY[user?.role || 'ПОЛЬЗОВАТЕЛЬ'] >= ROLE_HIERARCHY['ЗАМ ГЛАВНОГО АДМИНА'] && (
+                        <SelectItem value="ЗАМ ГЛАВНОГО АДМИНА">ЗАМ ГЛАВНОГО АДМИНА</SelectItem>
+                      )}
+                      {ROLE_HIERARCHY[user?.role || 'ПОЛЬЗОВАТЕЛЬ'] >= ROLE_HIERARCHY['ГЛАВНЫЙ АДМИН'] && (
+                        <SelectItem value="ГЛАВНЫЙ АДМИН">ГЛАВНЫЙ АДМИН</SelectItem>
+                      )}
+                      {ROLE_HIERARCHY[user?.role || 'ПОЛЬЗОВАТЕЛЬ'] >= ROLE_HIERARCHY['РУКОВОДИТЕЛЬ'] && (
+                        <SelectItem value="РУКОВОДИТЕЛЬ">РУКОВОДИТЕЛЬ</SelectItem>
+                      )}
+                      {ROLE_HIERARCHY[user?.role || 'ПОЛЬЗОВАТЕЛЬ'] >= ROLE_HIERARCHY['ЗАМ ВЛАДЕЛЬЦА'] && (
+                        <SelectItem value="ЗАМ ВЛАДЕЛЬЦА">ЗАМ ВЛАДЕЛЬЦА</SelectItem>
+                      )}
+                      {ROLE_HIERARCHY[user?.role || 'ПОЛЬЗОВАТЕЛЬ'] >= ROLE_HIERARCHY['ВЛАДЕЛЕЦ'] && (
+                        <SelectItem value="ВЛАДЕЛЕЦ">ВЛАДЕЛЕЦ</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
