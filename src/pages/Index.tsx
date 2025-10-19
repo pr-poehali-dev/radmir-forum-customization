@@ -8,8 +8,18 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
+
+interface Comment {
+  id: number;
+  topicId: number;
+  author: string;
+  content: string;
+  createdAt: Date;
+}
 
 interface Topic {
   id: number;
@@ -29,15 +39,33 @@ interface ForumSettings {
   requireAuth: boolean;
 }
 
+interface RegisteredUser {
+  username: string;
+  password: string;
+  email: string;
+  isAdmin: boolean;
+  registeredAt: Date;
+}
+
 export default function Index() {
   const [user, setUser] = useState<{ username: string; isAdmin: boolean } | null>(null);
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([
+    {
+      username: 'admin',
+      password: 'admin',
+      email: 'admin@radmir.rp',
+      isAdmin: true,
+      registeredAt: new Date('2025-01-01')
+    }
+  ]);
+
   const [topics, setTopics] = useState<Topic[]>([
     {
       id: 1,
       title: 'Правила форума Radmir RP',
       content: 'Добро пожаловать на форум Radmir RP! Здесь вы можете обсуждать игровые моменты...',
-      author: 'Admin',
-      replies: 45,
+      author: 'admin',
+      replies: 2,
       views: 1203,
       isOpen: true,
       isPinned: true,
@@ -48,7 +76,7 @@ export default function Index() {
       title: 'Где найти лучшую работу?',
       content: 'Подскажите, какая работа самая прибыльная на сервере?',
       author: 'Player123',
-      replies: 23,
+      replies: 1,
       views: 567,
       isOpen: true,
       isPinned: false,
@@ -59,11 +87,35 @@ export default function Index() {
       title: 'Обновление 2.0 - что нового?',
       content: 'Обсуждаем новое обновление сервера',
       author: 'Moderator',
-      replies: 89,
+      replies: 0,
       views: 2341,
       isOpen: false,
       isPinned: true,
       createdAt: new Date('2025-10-10')
+    }
+  ]);
+
+  const [comments, setComments] = useState<Comment[]>([
+    {
+      id: 1,
+      topicId: 1,
+      author: 'admin',
+      content: 'Не забывайте соблюдать правила!',
+      createdAt: new Date('2025-01-15')
+    },
+    {
+      id: 2,
+      topicId: 1,
+      author: 'Player123',
+      content: 'Понятно, спасибо!',
+      createdAt: new Date('2025-01-16')
+    },
+    {
+      id: 3,
+      topicId: 2,
+      author: 'Moderator',
+      content: 'Советую попробовать работу таксиста',
+      createdAt: new Date('2025-10-18')
     }
   ]);
 
@@ -76,6 +128,37 @@ export default function Index() {
   const [newTopic, setNewTopic] = useState({ title: '', content: '' });
   const [showNewTopicDialog, setShowNewTopicDialog] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [registerForm, setRegisterForm] = useState({ username: '', password: '', email: '' });
+  const [showRegisterDialog, setShowRegisterDialog] = useState(false);
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
+  const [newComment, setNewComment] = useState('');
+
+  const handleRegister = () => {
+    if (!registerForm.username || !registerForm.password || !registerForm.email) {
+      toast.error('Заполните все поля');
+      return;
+    }
+
+    if (registeredUsers.find(u => u.username.toLowerCase() === registerForm.username.toLowerCase())) {
+      toast.error('Пользователь с таким именем уже существует');
+      return;
+    }
+
+    const newUser: RegisteredUser = {
+      username: registerForm.username,
+      password: registerForm.password,
+      email: registerForm.email,
+      isAdmin: false,
+      registeredAt: new Date()
+    };
+
+    setRegisteredUsers([...registeredUsers, newUser]);
+    toast.success('Регистрация успешна! Теперь войдите в систему');
+    setRegisterForm({ username: '', password: '', email: '' });
+    setShowRegisterDialog(false);
+    setShowLoginDialog(true);
+  };
 
   const handleLogin = () => {
     if (!loginForm.username || !loginForm.password) {
@@ -83,10 +166,19 @@ export default function Index() {
       return;
     }
 
-    const isAdmin = loginForm.username.toLowerCase() === 'admin';
-    setUser({ username: loginForm.username, isAdmin });
-    toast.success(`Добро пожаловать, ${loginForm.username}!`);
+    const foundUser = registeredUsers.find(
+      u => u.username.toLowerCase() === loginForm.username.toLowerCase() && u.password === loginForm.password
+    );
+
+    if (!foundUser) {
+      toast.error('Неверный логин или пароль');
+      return;
+    }
+
+    setUser({ username: foundUser.username, isAdmin: foundUser.isAdmin });
+    toast.success(`Добро пожаловать, ${foundUser.username}!`);
     setLoginForm({ username: '', password: '' });
+    setShowLoginDialog(false);
   };
 
   const handleCreateTopic = () => {
@@ -118,6 +210,45 @@ export default function Index() {
     toast.success('Тема создана!');
   };
 
+  const handleAddComment = (topicId: number) => {
+    if (!user) {
+      toast.error('Войдите в аккаунт');
+      return;
+    }
+
+    if (!newComment.trim()) {
+      toast.error('Напишите комментарий');
+      return;
+    }
+
+    const comment: Comment = {
+      id: comments.length + 1,
+      topicId,
+      author: user.username,
+      content: newComment,
+      createdAt: new Date()
+    };
+
+    setComments([...comments, comment]);
+    setTopics(topics.map(t => t.id === topicId ? { ...t, replies: t.replies + 1 } : t));
+    setNewComment('');
+    toast.success('Комментарий добавлен!');
+  };
+
+  const deleteComment = (commentId: number) => {
+    if (!user?.isAdmin) {
+      toast.error('Только админы могут удалять комментарии');
+      return;
+    }
+
+    const comment = comments.find(c => c.id === commentId);
+    if (comment) {
+      setComments(comments.filter(c => c.id !== commentId));
+      setTopics(topics.map(t => t.id === comment.topicId ? { ...t, replies: Math.max(0, t.replies - 1) } : t));
+      toast.success('Комментарий удален');
+    }
+  };
+
   const toggleTopicStatus = (id: number) => {
     if (!user?.isAdmin) {
       toast.error('Только админы могут менять статус тем');
@@ -137,6 +268,7 @@ export default function Index() {
     }
 
     setTopics(topics.filter(topic => topic.id !== id));
+    setComments(comments.filter(comment => comment.topicId !== id));
     toast.success('Тема удалена');
   };
 
@@ -152,9 +284,16 @@ export default function Index() {
     toast.success('Статус закрепления изменен');
   };
 
+  const openTopicDialog = (topic: Topic) => {
+    setSelectedTopic(topic);
+    setTopics(topics.map(t => t.id === topic.id ? { ...t, views: t.views + 1 } : t));
+  };
+
   const pinnedTopics = topics.filter(t => t.isPinned).sort((a, b) => b.id - a.id);
   const regularTopics = topics.filter(t => !t.isPinned).sort((a, b) => b.id - a.id);
   const sortedTopics = [...pinnedTopics, ...regularTopics];
+
+  const topicComments = selectedTopic ? comments.filter(c => c.topicId === selectedTopic.id).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()) : [];
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] relative overflow-hidden">
@@ -171,44 +310,95 @@ export default function Index() {
             </div>
             
             {!user ? (
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button className="neon-border" style={{ backgroundColor: forumSettings.accentColor, color: '#0a0a0f' }}>
-                    <Icon name="LogIn" className="mr-2" size={18} />
-                    Войти
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-card border-border neon-border">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl" style={{ color: forumSettings.accentColor }}>Вход в систему</DialogTitle>
-                    <DialogDescription>Войдите для создания тем и комментариев</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Логин</Label>
-                      <Input 
-                        value={loginForm.username}
-                        onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-                        placeholder="Введите логин"
-                        className="bg-input border-border"
-                      />
-                    </div>
-                    <div>
-                      <Label>Пароль</Label>
-                      <Input 
-                        type="password"
-                        value={loginForm.password}
-                        onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                        placeholder="Введите пароль"
-                        className="bg-input border-border"
-                      />
-                    </div>
-                    <Button onClick={handleLogin} className="w-full neon-border" style={{ backgroundColor: forumSettings.accentColor, color: '#0a0a0f' }}>
+              <div className="flex gap-2">
+                <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+                  <DialogTrigger asChild>
+                    <Button className="neon-border" style={{ backgroundColor: forumSettings.accentColor, color: '#0a0a0f' }}>
+                      <Icon name="LogIn" className="mr-2" size={18} />
                       Войти
                     </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+                  <DialogContent className="bg-card border-border neon-border">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl" style={{ color: forumSettings.accentColor }}>Вход в систему</DialogTitle>
+                      <DialogDescription>Войдите для создания тем и комментариев</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Логин</Label>
+                        <Input 
+                          value={loginForm.username}
+                          onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                          placeholder="Введите логин"
+                          className="bg-input border-border"
+                        />
+                      </div>
+                      <div>
+                        <Label>Пароль</Label>
+                        <Input 
+                          type="password"
+                          value={loginForm.password}
+                          onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                          placeholder="Введите пароль"
+                          className="bg-input border-border"
+                        />
+                      </div>
+                      <Button onClick={handleLogin} className="w-full neon-border" style={{ backgroundColor: forumSettings.accentColor, color: '#0a0a0f' }}>
+                        Войти
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={showRegisterDialog} onOpenChange={setShowRegisterDialog}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="border-border neon-border-blue">
+                      <Icon name="UserPlus" className="mr-2" size={18} />
+                      Регистрация
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-card border-border neon-border-blue">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl text-secondary">Регистрация</DialogTitle>
+                      <DialogDescription>Создайте аккаунт для участия в форуме</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Логин</Label>
+                        <Input 
+                          value={registerForm.username}
+                          onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
+                          placeholder="Придумайте логин"
+                          className="bg-input border-border"
+                        />
+                      </div>
+                      <div>
+                        <Label>Email</Label>
+                        <Input 
+                          type="email"
+                          value={registerForm.email}
+                          onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                          placeholder="Введите email"
+                          className="bg-input border-border"
+                        />
+                      </div>
+                      <div>
+                        <Label>Пароль</Label>
+                        <Input 
+                          type="password"
+                          value={registerForm.password}
+                          onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                          placeholder="Придумайте пароль"
+                          className="bg-input border-border"
+                        />
+                      </div>
+                      <Button onClick={handleRegister} className="w-full neon-border-blue" style={{ backgroundColor: '#00d4ff', color: '#0a0a0f' }}>
+                        Зарегистрироваться
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             ) : (
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -295,7 +485,7 @@ export default function Index() {
 
             <div className="space-y-3">
               {sortedTopics.map((topic) => (
-                <Card key={topic.id} className="bg-card border-border hover:border-primary/50 transition-all duration-300 hover:neon-border">
+                <Card key={topic.id} className="bg-card border-border hover:border-primary/50 transition-all duration-300 hover:neon-border cursor-pointer" onClick={() => openTopicDialog(topic)}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
@@ -314,7 +504,7 @@ export default function Index() {
                         <CardDescription>{topic.content}</CardDescription>
                       </div>
                       {user?.isAdmin && (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                           <Button size="sm" variant="outline" onClick={() => togglePinTopic(topic.id)} className="border-border">
                             <Icon name={topic.isPinned ? "PinOff" : "Pin"} size={16} />
                           </Button>
@@ -358,7 +548,7 @@ export default function Index() {
               <h2 className="text-2xl font-bold">Мои темы</h2>
               <div className="space-y-3">
                 {sortedTopics.filter(t => t.author === user.username).map((topic) => (
-                  <Card key={topic.id} className="bg-card border-border hover:neon-border transition-all">
+                  <Card key={topic.id} className="bg-card border-border hover:neon-border transition-all cursor-pointer" onClick={() => openTopicDialog(topic)}>
                     <CardHeader>
                       <div className="flex items-center gap-2 mb-2">
                         <Badge variant={topic.isOpen ? "default" : "secondary"} style={topic.isOpen ? { backgroundColor: forumSettings.accentColor, color: '#0a0a0f' } : {}}>
@@ -447,14 +637,14 @@ export default function Index() {
                       </Card>
                       <Card className="bg-secondary/10 border-secondary/30">
                         <CardContent className="pt-6">
-                          <div className="text-3xl font-bold text-secondary">{topics.filter(t => t.isOpen).length}</div>
-                          <p className="text-sm text-muted-foreground">Открытых тем</p>
+                          <div className="text-3xl font-bold text-secondary">{registeredUsers.length}</div>
+                          <p className="text-sm text-muted-foreground">Пользователей</p>
                         </CardContent>
                       </Card>
                       <Card className="bg-accent/10 border-accent/30">
                         <CardContent className="pt-6">
-                          <div className="text-3xl font-bold text-accent">{topics.filter(t => t.isPinned).length}</div>
-                          <p className="text-sm text-muted-foreground">Закрепленных</p>
+                          <div className="text-3xl font-bold text-accent">{comments.length}</div>
+                          <p className="text-sm text-muted-foreground">Комментариев</p>
                         </CardContent>
                       </Card>
                     </div>
@@ -465,6 +655,104 @@ export default function Index() {
           )}
         </Tabs>
       </div>
+
+      <Dialog open={!!selectedTopic} onOpenChange={(open) => !open && setSelectedTopic(null)}>
+        <DialogContent className="bg-card border-border neon-border max-w-4xl max-h-[80vh] flex flex-col">
+          {selectedTopic && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2 mb-2">
+                  {selectedTopic.isPinned && (
+                    <Badge className="bg-secondary text-secondary-foreground">
+                      <Icon name="Pin" size={12} className="mr-1" />
+                      Закреплено
+                    </Badge>
+                  )}
+                  <Badge variant={selectedTopic.isOpen ? "default" : "secondary"} style={selectedTopic.isOpen ? { backgroundColor: forumSettings.accentColor, color: '#0a0a0f' } : {}}>
+                    {selectedTopic.isOpen ? 'Открыта' : 'Закрыта'}
+                  </Badge>
+                </div>
+                <DialogTitle className="text-2xl" style={{ color: forumSettings.accentColor }}>{selectedTopic.title}</DialogTitle>
+                <DialogDescription className="text-base">{selectedTopic.content}</DialogDescription>
+                <div className="flex items-center gap-6 text-sm text-muted-foreground pt-2">
+                  <div className="flex items-center gap-2">
+                    <Icon name="User" size={16} />
+                    <span>{selectedTopic.author}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Icon name="Calendar" size={16} />
+                    <span>{selectedTopic.createdAt.toLocaleDateString('ru-RU')}</span>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <Separator className="my-4" />
+
+              <ScrollArea className="flex-1 pr-4">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg">Комментарии ({topicComments.length})</h3>
+                  
+                  {topicComments.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">Пока нет комментариев</p>
+                  ) : (
+                    topicComments.map((comment) => (
+                      <Card key={comment.id} className="bg-muted/30 border-border">
+                        <CardContent className="pt-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center neon-border" style={{ backgroundColor: forumSettings.accentColor + '20' }}>
+                                <Icon name="User" size={16} style={{ color: forumSettings.accentColor }} />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-sm">{comment.author}</p>
+                                <p className="text-xs text-muted-foreground">{comment.createdAt.toLocaleString('ru-RU')}</p>
+                              </div>
+                            </div>
+                            {user?.isAdmin && (
+                              <Button size="sm" variant="ghost" onClick={() => deleteComment(comment.id)} className="text-destructive hover:text-destructive">
+                                <Icon name="Trash2" size={14} />
+                              </Button>
+                            )}
+                          </div>
+                          <p className="text-sm">{comment.content}</p>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+
+              {user && selectedTopic.isOpen && (
+                <div className="pt-4 border-t border-border mt-4">
+                  <div className="flex gap-2">
+                    <Textarea 
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Напишите комментарий..."
+                      className="bg-input border-border min-h-[80px]"
+                    />
+                    <Button onClick={() => handleAddComment(selectedTopic.id)} className="neon-border self-end" style={{ backgroundColor: forumSettings.accentColor, color: '#0a0a0f' }}>
+                      <Icon name="Send" size={18} />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!user && (
+                <div className="pt-4 border-t border-border mt-4 text-center text-muted-foreground">
+                  Войдите в аккаунт для добавления комментариев
+                </div>
+              )}
+
+              {selectedTopic.isOpen === false && (
+                <div className="pt-4 border-t border-border mt-4 text-center text-muted-foreground">
+                  Тема закрыта для комментариев
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
